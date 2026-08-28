@@ -1,0 +1,1012 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>店舖每日收支・月結對帳</title>
+
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#2f6fed">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="店舖收支">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+
+<style>
+:root{
+  --bg:#f5f6f8;--card:#fff;--text:#17191c;--muted:#667085;--border:#d9dde4;
+  --accent:#2f6fed;--accent-soft:#eef4ff;--danger:#b42318;--danger-soft:#fff1f0;
+  --success:#087443;--warning:#9a6700;--shadow:0 8px 22px rgba(20,27,38,.06)
+}
+*{box-sizing:border-box}html{background:var(--bg);color:var(--text)}
+body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif}
+button,input,select,textarea{font:inherit}button{cursor:pointer}
+button:disabled{opacity:.55;cursor:not-allowed}
+input,select,textarea{width:100%;min-height:44px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:#fff;color:var(--text)}
+input:focus,select:focus,textarea:focus,button:focus-visible{outline:3px solid rgba(47,111,237,.22);outline-offset:1px}
+.shell{width:min(1180px,calc(100% - 20px));margin:auto;padding:14px 0 48px}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.title{font-size:20px;font-weight:800}.subtitle,.muted{color:var(--muted)}.small{font-size:13px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:var(--shadow)}
+.stack{display:grid;gap:14px}.grid2{display:grid;grid-template-columns:1.06fr .94fr;gap:16px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.form2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.row{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.between{justify-content:space-between}.label{display:grid;gap:6px;min-width:0}.label>span{font-size:14px}
+.h2{font-size:18px;font-weight:800}.metric{font-size:26px;font-weight:800;margin-top:3px;overflow-wrap:anywhere}
+.btn{min-height:44px;border:1px solid var(--border);border-radius:10px;background:#fff;color:var(--text);padding:9px 14px}
+.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:700}.btn-danger{background:var(--danger-soft);color:var(--danger);border-color:#f3c7c2}.btn-soft{background:var(--accent-soft);border-color:#cad9ff}
+.notice{border:1px solid var(--border);border-radius:11px;padding:11px 12px;font-size:14px}.notice-danger{background:var(--danger-soft);color:var(--danger)}.notice-warn{background:#fff8df;color:var(--warning)}
+.pill{display:inline-flex;align-items:center;min-height:28px;padding:4px 9px;border-radius:999px;background:var(--accent-soft);font-size:12px}
+.record{border:1px solid var(--border);border-radius:12px;padding:12px}.record.voided{opacity:.58}.divider{border-top:1px solid var(--border);padding-top:11px}
+.group{border:1px solid var(--border);border-radius:13px;overflow:hidden}.group-head{background:#f8f9fb;padding:11px 12px}.category-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.category-item{border:1px solid var(--border);border-radius:12px;padding:11px;background:#fff}.category-item .value{font-size:18px;font-weight:800;margin-top:3px}
+.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:760px}th,td{padding:9px 10px;border-bottom:1px solid var(--border);font-size:13px;text-align:left;vertical-align:top}th{color:var(--muted);font-weight:650}.right{text-align:right}
+.hidden{display:none!important}.backup-ok{color:var(--success)}.backup-bad{color:var(--danger)}
+details>summary{cursor:pointer;font-weight:700}
+@media(max-width:850px){.grid2,.grid3,.grid4,.form2,.category-grid{grid-template-columns:1fr}.shell{width:min(100% - 12px,1180px)}}
+@media print{
+  body{background:#fff}.no-print{display:none!important}.shell{width:100%;padding:0}.card{box-shadow:none;border:1px solid #ddd;break-inside:avoid}.report-only{display:block!important}
+  .grid2,.grid3,.grid4{display:grid;grid-template-columns:repeat(2,1fr)}table{min-width:0;font-size:10px}
+}
+</style>
+</head>
+<body>
+<main class="shell stack">
+<header class="topbar">
+  <div>
+    <div class="title">店舖每日收支・月結對帳</div>
+    <div class="subtitle small">單機自動儲存 · 跨月收付款 · LINE Pay 淨收入 · 備份還原</div>
+  </div>
+  <div class="row no-print">
+    <span id="saveStatus" class="pill">載入資料中…</span>
+    <button id="backupPanelBtn" class="btn" type="button">備份與搬家</button>
+  </div>
+</header>
+
+<section id="backupPanel" class="card stack no-print hidden">
+  <div class="row between">
+    <div>
+      <div class="h2">備份與設備搬家</div>
+      <div class="muted small">本機資料會自動寫入 IndexedDB；Google Drive / 外接硬碟作為第二份備份。</div>
+    </div>
+    <button id="closeBackupPanel" class="btn" type="button">關閉</button>
+  </div>
+  <div class="grid4">
+    <div>
+      <div class="muted small">本機資料</div>
+      <div id="localDbStatus" class="metric">—</div>
+    </div>
+    <div>
+      <div class="muted small">儲存保護</div>
+      <div id="persistenceStatus" class="metric" style="font-size:18px">檢查中…</div>
+    </div>
+    <div>
+      <div class="muted small">最近備份</div>
+      <div id="lastBackup" class="metric" style="font-size:18px">尚未備份</div>
+    </div>
+    <div>
+      <div class="muted small">備份資料夾</div>
+      <div id="backupFolderStatus" class="metric" style="font-size:18px">尚未連結</div>
+    </div>
+  </div>
+  <div class="row">
+    <button id="chooseBackupFolder" class="btn btn-soft" type="button">選擇 Google Drive / 備份資料夾</button>
+    <button id="backupNow" class="btn" type="button">立即建立版本備份</button>
+    <button id="downloadBackup" class="btn" type="button">下載完整備份</button>
+    <label class="btn" style="display:inline-flex;align-items:center">
+      從備份恢復
+      <input id="restoreInput" type="file" accept=".json,application/json" style="display:none">
+    </label>
+  </div>
+  <div id="backupMessage" class="notice muted">
+    建議：把備份資料夾選在 Google Drive for desktop 的同步資料夾。若瀏覽器不支援自動寫入資料夾，仍可用「下載完整備份」。
+  </div>
+</section>
+
+<section class="grid2">
+<form id="recordForm" class="card stack no-print">
+  <div class="row between">
+    <div>
+      <div id="formTitle" class="h2">每日收支登記</div>
+      <div id="formHint" class="muted small">每天最常使用的功能放在最前面。</div>
+    </div>
+    <button id="cancelEdit" class="btn hidden" type="button">取消編輯</button>
+  </div>
+
+  <div class="form2">
+    <label class="label"><span>類型</span><select id="type"><option value="income">收入</option><option value="expense">支出</option></select></label>
+    <label class="label"><span>金額</span><input id="amount" type="number" min="1" step="1" required placeholder="例如 5000"></label>
+  </div>
+  <div class="form2">
+    <label class="label"><span>歸屬日期</span><input id="occurredAt" type="date" required></label>
+    <label class="label"><span>金流方式</span><select id="account"><option value="cash">現金</option><option value="linepay">LINE Pay</option><option value="bank">銀行</option><option value="other">其他</option></select></label>
+  </div>
+
+  <div id="linePayBox" class="card hidden" style="padding:12px;box-shadow:none">
+    <div class="form2">
+      <label class="label"><span>LINE Pay 手續費率 %</span><input id="lineRate" type="number" min="0" max="100" step="0.01" value="0"></label>
+      <div>
+        <div class="muted small">LINE Pay 淨收入</div>
+        <div id="linePreview" class="metric">$0</div>
+        <div class="muted small">手續費只扣一次，不會再重複列入支出。</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="expenseBox" class="form2 hidden">
+    <label class="label"><span>支出性質</span><select id="frequency"><option value="daily">每日 / 日常</option><option value="monthly">月份固定 / 期間</option><option value="occasional">臨時</option></select></label>
+    <label class="label"><span>支出分類</span><select id="category"><option>材料進貨</option><option>水電</option><option>人事</option><option>房租</option><option>運費</option><option>設備</option><option>行銷</option><option>雜支</option><option>其他</option></select></label>
+  </div>
+
+  <label class="row notice">
+    <input id="pendingToggle" type="checkbox" style="width:20px;min-height:20px">
+    <span><strong class="small">這筆尚未收 / 付</strong><span class="muted small" style="display:block">一般已完成交易會直接把「歸屬日期」視為實際收付款日。</span></span>
+  </label>
+  <label id="settledWrap" class="label hidden"><span>實際收 / 付款日期</span><input id="settledAt" type="date"></label>
+  <label id="expectedWrap" class="label hidden"><span>預計收 / 付款日期</span><input id="expectedAt" type="date"></label>
+
+  <label class="label"><span>名稱 / 備註</span><input id="note" maxlength="100" placeholder="例如：今日營業額、8 月水電、材料採購"></label>
+  <div id="formMessage" class="small muted"></div>
+  <button id="saveRecordBtn" class="btn btn-primary" type="submit">新增流水</button>
+</form>
+
+<section class="card stack no-print">
+  <div>
+    <div class="h2">每日帳目回查</div>
+    <div class="muted small">可編輯、作廢或恢復作廢紀錄。</div>
+  </div>
+  <div class="row">
+    <button id="prevDay" class="btn" type="button">←</button>
+    <label class="label" style="flex:1"><span>查看歸屬日期</span><input id="dailyDate" type="date"></label>
+    <button id="nextDay" class="btn" type="button">→</button>
+  </div>
+  <div class="grid3">
+    <div><div class="muted small">當日收入</div><div id="dailyIncome" class="metric">$0</div></div>
+    <div><div class="muted small">當日支出</div><div id="dailyExpense" class="metric">$0</div></div>
+    <div><div class="muted small">當日淨收入</div><div id="dailyNet" class="metric">$0</div></div>
+  </div>
+  <div id="dailyEmpty" class="notice muted">這一天沒有紀錄。</div>
+  <div id="dailyRecords" class="stack"></div>
+</section>
+</section>
+
+<section class="card stack no-print">
+  <div class="row between">
+    <div>
+      <div class="h2">月／季／年營運報表</div>
+      <div class="muted small">營運歸屬依「歸屬日期」；資金位置依「實際收付款日期」。</div>
+    </div>
+    <div class="row">
+      <button class="btn viewBtn" data-view="month" type="button">月</button>
+      <button class="btn viewBtn" data-view="quarter" type="button">季</button>
+      <button class="btn viewBtn" data-view="year" type="button">年</button>
+      <button id="exportPdf" class="btn btn-primary" type="button">輸出老闆 PDF</button>
+    </div>
+  </div>
+  <div class="form2">
+    <label id="monthWrap" class="label"><span>月份</span><input id="reportMonth" type="month"></label>
+    <label id="yearWrap" class="label hidden"><span>年份</span><input id="reportYear" type="number" min="2000" max="2100"></label>
+    <label id="quarterWrap" class="label hidden"><span>季度</span><select id="reportQuarter"><option value="1">Q1（1–3 月）</option><option value="2">Q2（4–6 月）</option><option value="3">Q3（7–9 月）</option><option value="4">Q4（10–12 月）</option></select></label>
+  </div>
+</section>
+
+<section class="card no-print">
+  <div class="row between">
+    <div>
+      <div class="h2">待收 / 待付追蹤</div>
+      <div class="muted small">跨月未完成款會一直保留，直到填入實際收付款日。</div>
+    </div>
+    <span id="overduePill" class="pill hidden"></span>
+  </div>
+  <div class="grid3" style="margin-top:12px">
+    <div><div class="muted small">尚未收到</div><div id="pendingReceivable" class="metric">$0</div></div>
+    <div><div class="muted small">尚未支付</div><div id="pendingPayable" class="metric">$0</div></div>
+    <div><div class="muted small">未完成筆數</div><div id="pendingCount" class="metric">0</div></div>
+  </div>
+</section>
+
+<div id="reportArea" class="stack">
+<section class="card">
+  <div class="row between"><div class="h2">營運歸屬摘要</div><div id="periodTitle" class="muted small"></div></div>
+  <div class="grid4" style="margin-top:14px">
+    <div><div class="muted small">現金收入</div><div id="cashIncome" class="metric">$0</div></div>
+    <div><div class="muted small">LINE Pay 淨收入</div><div id="lineNetIncome" class="metric">$0</div></div>
+    <div><div class="muted small">營業支出</div><div id="businessExpense" class="metric">$0</div></div>
+    <div><div class="muted small">淨收入</div><div id="businessNet" class="metric">$0</div></div>
+  </div>
+</section>
+
+<section class="grid2">
+  <div class="card stack">
+    <div class="h2">收入拆分</div>
+    <div class="row between"><span class="muted">現金收入</span><strong id="incomeCash">$0</strong></div>
+    <div class="row between"><span class="muted">LINE Pay 淨收入</span><strong id="incomeLineNet">$0</strong></div>
+    <div class="row between"><span class="muted">銀行 / 其他收入</span><strong id="incomeOther">$0</strong></div>
+    <div class="row between divider"><span>總收入</span><strong id="totalIncome">$0</strong></div>
+    <div class="muted small">LINE Pay 手續費 <strong id="lineFeeInfo">$0</strong> 已從 LINE Pay 淨收入扣除，不重複列支出。</div>
+  </div>
+  <div class="card stack">
+    <div class="h2">支出拆分</div>
+    <div class="row between"><span class="muted">每日 / 日常</span><strong id="expenseDaily">$0</strong></div>
+    <div class="row between"><span class="muted">水電 / 人事 / 房租等</span><strong id="expenseMonthly">$0</strong></div>
+    <div class="row between"><span class="muted">臨時支出</span><strong id="expenseOccasional">$0</strong></div>
+    <div class="row between divider"><span>營業支出總計</span><strong id="expenseTotal">$0</strong></div>
+  </div>
+</section>
+
+<section class="card stack">
+  <div class="row between">
+    <div>
+      <div class="h2">支出分類總結</div>
+      <div class="muted small">依目前選擇的月／季／年期間統計，快速看出成本與各類支出去向。</div>
+    </div>
+    <div>
+      <div class="muted small">材料進貨成本</div>
+      <div id="materialCostTotal" class="metric">$0</div>
+    </div>
+  </div>
+  <div id="expenseCategoryGrid" class="category-grid"></div>
+</section>
+
+<section id="settlementCard" class="card stack">
+  <div>
+    <div class="h2">月底淨收入 → 資金位置 → 結算老闆</div>
+    <div class="muted small">選這次交款的資金來源即可；公司帳戶領現後直接交老闆，不必記兩次。</div>
+  </div>
+  <div class="grid4">
+    <div><div class="muted small">本月淨收入</div><div id="ownerDue" class="metric">$0</div></div>
+    <div><div class="muted small">目前營運可結算現金</div><div id="cashAvailable" class="metric">$0</div></div>
+    <div><div class="muted small">目前公司帳戶可用新增資金</div><div id="digitalAvailable" class="metric">$0</div></div>
+    <div><div class="muted small">尚未結算老闆</div><div id="ownerRemaining" class="metric">$0</div></div>
+  </div>
+  <div class="grid3">
+    <div><div class="muted small">本月店內現金已交</div><div id="cashOwnerPaid" class="metric">$0</div></div>
+    <div><div class="muted small">本月公司帳戶領現已交</div><div id="bankOwnerPaid" class="metric">$0</div></div>
+    <div><div class="muted small">若要全部結清，建議公司帳戶補足</div><div id="bankNeeded" class="metric">$0</div></div>
+  </div>
+  <div id="settlementWarning" class="notice notice-warn hidden"></div>
+
+  <div class="card stack no-print" style="padding:12px;box-shadow:none">
+    <strong>本次結算給老闆</strong>
+    <div class="form2">
+      <label class="label">
+        <span>資金來源</span>
+        <select id="ownerPaySource">
+          <option value="cash">店內現金</option>
+          <option value="bank">公司帳戶領現後直接交老闆</option>
+        </select>
+      </label>
+      <label class="label">
+        <span>本次金額</span>
+        <input id="ownerSettlementAmount" type="number" min="0" step="1" placeholder="輸入交給老闆的金額">
+      </label>
+    </div>
+    <div class="row">
+      <button id="fillOwnerSettlement" class="btn" type="button">帶入可結算金額</button>
+      <button id="saveOwnerSettlement" class="btn btn-primary" type="button">記錄結算</button>
+    </div>
+  </div>
+  <div id="settlementMessage" class="small muted no-print"></div>
+  <div class="divider">
+    <div class="row between">
+      <div>
+        <strong>本月結算紀錄</strong>
+        <div class="muted small">輸入錯誤時用「作廢」更正，不直接刪除紀錄。</div>
+      </div>
+    </div>
+    <div id="settlementHistory" class="stack" style="margin-top:10px"></div>
+    <div id="settlementHistoryEmpty" class="notice muted" style="margin-top:10px">本月尚無結算紀錄。</div>
+  </div>
+</section>
+
+<section class="card stack">
+  <div class="row between">
+    <div><div class="h2">期間逐日收支明細</div><div id="listCount" class="muted small">0 筆</div></div>
+  </div>
+  <div id="periodEmpty" class="notice muted">這個期間沒有紀錄。</div>
+  <div id="groupedLedger" class="stack"></div>
+  <div id="periodTotals" class="grid3 divider hidden">
+    <div><div class="muted small">期間收入總計</div><div id="periodIncomeTotal" class="metric">$0</div></div>
+    <div><div class="muted small">期間支出總計</div><div id="periodExpenseTotal" class="metric">$0</div></div>
+    <div><div class="muted small">期間淨收入</div><div id="periodNetTotal" class="metric">$0</div></div>
+  </div>
+</section>
+</div>
+</main>
+
+<script>
+(() => {
+"use strict";
+
+const DB_NAME = "shop-ledger-local";
+const DB_VERSION = 1;
+const BACKUP_VERSION = 1;
+const stores = ["transactions","transfers","audit","meta"];
+let db = null;
+let state = { transactions: [], transfers: [], audit: [], editingId: null, editingWasPending: false, view: "month", backupHandle: null };
+let backupTimer = null;
+
+const $ = id => document.getElementById(id);
+let today = localDate(new Date());
+const monthNow = today.slice(0,7);
+$("occurredAt").value = today;
+$("settledAt").value = today;
+$("dailyDate").value = today;
+$("reportMonth").value = monthNow;
+$("reportYear").value = String(new Date().getFullYear());
+$("reportQuarter").value = String(Math.floor(new Date().getMonth()/3)+1);
+
+function localDate(d){
+  return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-");
+}
+function refreshToday(){
+  const next=localDate(new Date());
+  if(next===today) return false;
+  const previous=today;
+  today=next;
+
+  // 如果程式跨午夜仍開著，只更新「仍停在昨天預設值」的新交易欄位。
+  // 使用者已手動選擇的歷史日期不會被改掉。
+  if(!state.editingId && $("occurredAt").value===previous){
+    $("occurredAt").value=today;
+  }
+  if(!state.editingId && $("settledAt").value===previous){
+    $("settledAt").value=today;
+  }
+  return true;
+}
+function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function money(v){return new Intl.NumberFormat("zh-TW",{style:"currency",currency:"TWD",maximumFractionDigits:0}).format(Number.isFinite(v)?v:0);}
+function uuid(){return crypto.randomUUID ? crypto.randomUUID() : Date.now()+"-"+Math.random().toString(16).slice(2);}
+function calcFee(amount,rate){return Math.round(amount*rate)/100;}
+function lineNet(r){return r.account==="linepay" ? r.grossAmount-r.lineFeeAmount : r.grossAmount;}
+function accountName(a){return ({cash:"現金",linepay:"LINE Pay",bank:"銀行",other:"其他"})[a] || a;}
+function canonicalCategory(category){
+  if(category==="進貨"||category==="材料") return "材料進貨";
+  return category || "其他";
+}
+function expenseCategorySummary(rows){
+  const result={};
+  rows.filter(r=>!r.voidedAt&&r.type==="expense").forEach(r=>{
+    const key=canonicalCategory(r.category);
+    result[key]=(result[key]||0)+r.grossAmount;
+  });
+  return result;
+}
+
+function openDB(){
+  return new Promise((resolve,reject)=>{
+    const request=indexedDB.open(DB_NAME,DB_VERSION);
+    request.onupgradeneeded=()=>{
+      const idb=request.result;
+      if(!idb.objectStoreNames.contains("transactions")) idb.createObjectStore("transactions",{keyPath:"id"});
+      if(!idb.objectStoreNames.contains("transfers")) idb.createObjectStore("transfers",{keyPath:"id"});
+      if(!idb.objectStoreNames.contains("audit")) idb.createObjectStore("audit",{keyPath:"id"});
+      if(!idb.objectStoreNames.contains("meta")) idb.createObjectStore("meta",{keyPath:"key"});
+    };
+    request.onsuccess=()=>resolve(request.result);
+    request.onerror=()=>reject(request.error);
+  });
+}
+function getAll(store){
+  return new Promise((resolve,reject)=>{
+    const req=db.transaction(store,"readonly").objectStore(store).getAll();
+    req.onsuccess=()=>resolve(req.result); req.onerror=()=>reject(req.error);
+  });
+}
+function getOne(store,key){
+  return new Promise((resolve,reject)=>{
+    const req=db.transaction(store,"readonly").objectStore(store).get(key);
+    req.onsuccess=()=>resolve(req.result); req.onerror=()=>reject(req.error);
+  });
+}
+function put(store,value){
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(store,"readwrite"); tx.objectStore(store).put(value);
+    tx.oncomplete=()=>resolve(); tx.onerror=()=>reject(tx.error);
+  });
+}
+function clearStore(store){
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(store,"readwrite"); tx.objectStore(store).clear();
+    tx.oncomplete=()=>resolve(); tx.onerror=()=>reject(tx.error);
+  });
+}
+async function loadAll(){
+  [state.transactions,state.transfers,state.audit]=await Promise.all([getAll("transactions"),getAll("transfers"),getAll("audit")]);
+  const handleRec=await getOne("meta","backupFolderHandle");
+  if(handleRec?.value) state.backupHandle=handleRec.value;
+  await renderBackupStatus();
+}
+async function audit(action,entityType,entityId,before,after){
+  const row={id:uuid(),at:new Date().toISOString(),action,entityType,entityId,before:before||null,after:after||null};
+  state.audit.push(row); await put("audit",row);
+}
+async function saveMutation(){
+  $("saveStatus").textContent="✓ 本機資料已儲存";
+  $("saveStatus").classList.add("backup-ok");
+  scheduleAutoBackup();
+  render();
+}
+function scheduleAutoBackup(){
+  clearTimeout(backupTimer);
+  backupTimer=setTimeout(()=>autoBackup(false),1200);
+}
+function makeBackup(){
+  return {
+    app:"店舖每日收支・月結對帳",
+    backupVersion:BACKUP_VERSION,
+    exportedAt:new Date().toISOString(),
+    transactions:state.transactions,
+    transfers:state.transfers,
+    audit:state.audit
+  };
+}
+function backupText(){return JSON.stringify(makeBackup(),null,2);}
+async function verifyHandlePermission(handle,request=false){
+  if(!handle) return false;
+  try{
+    const options={mode:"readwrite"};
+    if((await handle.queryPermission(options))==="granted") return true;
+    if(request && (await handle.requestPermission(options))==="granted") return true;
+  }catch{}
+  return false;
+}
+async function chooseBackupFolder(){
+  if(!window.showDirectoryPicker){
+    $("backupMessage").textContent="目前瀏覽器不支援直接寫入資料夾。請使用 Chrome / Edge，或改用「下載完整備份」。";
+    return;
+  }
+  try{
+    const handle=await window.showDirectoryPicker({mode:"readwrite"});
+    state.backupHandle=handle;
+    await put("meta",{key:"backupFolderHandle",value:handle});
+    $("backupMessage").textContent="備份資料夾已連結。建議選 Google Drive for desktop 的同步資料夾。";
+    await renderBackupStatus();
+    await autoBackup(true);
+  }catch(e){
+    if(e?.name!=="AbortError") $("backupMessage").textContent="無法連結備份資料夾："+e.message;
+  }
+}
+async function writeFileToHandle(name,content){
+  const fileHandle=await state.backupHandle.getFileHandle(name,{create:true});
+  const writable=await fileHandle.createWritable();
+  await writable.write(content); await writable.close();
+}
+async function autoBackup(makeVersion){
+  refreshToday();
+  if(!state.backupHandle) return;
+  if(!(await verifyHandlePermission(state.backupHandle,false))) return;
+  try{
+    const text=backupText();
+    await writeFileToHandle("店舖帳務_latest.json",text);
+    const day=today;
+    await writeFileToHandle(`店舖帳務_${day}.json`,text);
+    if(makeVersion){
+      const stamp=new Date().toISOString().replace(/[:.]/g,"-");
+      await writeFileToHandle(`店舖帳務_${stamp}.json`,text);
+    }
+    const iso=new Date().toISOString();
+    await put("meta",{key:"lastBackupAt",value:iso});
+    $("lastBackup").textContent=new Date(iso).toLocaleString("zh-TW");
+    $("backupMessage").textContent="✓ 備份完成。若這個資料夾位於 Google Drive 同步區，雲端會再同步一份。";
+  }catch(e){
+    $("backupMessage").textContent="備份失敗："+e.message;
+  }
+}
+function downloadBackup(){
+  const blob=new Blob([backupText()],{type:"application/json;charset=utf-8"});
+  const url=URL.createObjectURL(blob); const a=document.createElement("a");
+  a.href=url; a.download=`店舖帳務完整備份_${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+}
+async function restoreFromFile(file){
+  let data;
+  try{data=JSON.parse(await file.text());}catch{alert("這不是有效的 JSON 備份檔。");return;}
+  if(data?.backupVersion!==BACKUP_VERSION || !Array.isArray(data.transactions) || !Array.isArray(data.transfers)){
+    alert("備份格式不正確或版本不相容。");return;
+  }
+  const active=data.transactions.filter(x=>!x.voidedAt);
+  const dates=active.map(x=>x.occurredAt).filter(Boolean).sort();
+  const summary=`備份時間：${new Date(data.exportedAt).toLocaleString("zh-TW")}\n收支紀錄：${data.transactions.length} 筆\n資金移轉：${data.transfers.length} 筆\n最早紀錄：${dates[0]||"無"}\n最新紀錄：${dates.at(-1)||"無"}\n\n恢復會取代目前本機資料。確定繼續？`;
+  if(!confirm(summary)) return;
+  // 優先先把現況備份出去
+  if(state.backupHandle && await verifyHandlePermission(state.backupHandle,false)){
+    try{await autoBackup(true);}catch{}
+  }
+  await Promise.all(stores.filter(s=>s!=="meta").map(clearStore));
+  state.transactions=data.transactions||[];state.transfers=data.transfers||[];state.audit=data.audit||[];
+  for(const r of state.transactions) await put("transactions",r);
+  for(const r of state.transfers) await put("transfers",r);
+  for(const r of state.audit) await put("audit",r);
+  await audit("RESTORE","backup","restore",null,{file:file.name,exportedAt:data.exportedAt});
+  $("backupMessage").textContent="✓ 備份已恢復。建議立即建立一份新的版本備份。";
+  await saveMutation();
+}
+async function requestPersistentStorage(){
+  const status=$("persistenceStatus");
+  if(!navigator.storage?.persisted){
+    status.textContent="瀏覽器不支援";
+    status.className="metric backup-bad";
+    return false;
+  }
+
+  try{
+    let persisted=await navigator.storage.persisted();
+    if(!persisted && navigator.storage.persist){
+      persisted=await navigator.storage.persist();
+    }
+    status.textContent=persisted ? "✓ 已啟用" : "瀏覽器管理";
+    status.className="metric "+(persisted?"backup-ok":"");
+    return persisted;
+  }catch{
+    status.textContent="無法確認";
+    status.className="metric";
+    return false;
+  }
+}
+async function renderBackupStatus(){
+  $("localDbStatus").textContent=`${state.transactions.length} 筆`;
+  const last=await getOne("meta","lastBackupAt");
+  const lastEl=$("lastBackup");
+
+  if(last?.value){
+    const dt=new Date(last.value);
+    lastEl.textContent=dt.toLocaleString("zh-TW");
+    const ageDays=(Date.now()-dt.getTime())/(1000*60*60*24);
+    lastEl.classList.toggle("backup-bad",ageDays>7);
+    lastEl.classList.toggle("backup-ok",ageDays<=7);
+  }else{
+    lastEl.textContent="尚未備份";
+    lastEl.classList.add("backup-bad");
+    lastEl.classList.remove("backup-ok");
+  }
+
+  const ok=state.backupHandle && await verifyHandlePermission(state.backupHandle,false);
+  $("backupFolderStatus").textContent=state.backupHandle ? (ok?"已連結":"需重新授權") : "尚未連結";
+}
+
+function businessCalc(rows){
+  const active=rows.filter(r=>!r.voidedAt);
+  const incomes=active.filter(r=>r.type==="income"),expenses=active.filter(r=>r.type==="expense");
+  const cash=incomes.filter(r=>r.account==="cash").reduce((s,r)=>s+r.grossAmount,0);
+  const lineNetIncome=incomes.filter(r=>r.account==="linepay").reduce((s,r)=>s+lineNet(r),0);
+  const lineFees=incomes.filter(r=>r.account==="linepay").reduce((s,r)=>s+r.lineFeeAmount,0);
+  const other=incomes.filter(r=>["bank","other"].includes(r.account)).reduce((s,r)=>s+r.grossAmount,0);
+  const totalIncome=cash+lineNetIncome+other;
+  const totalExpense=expenses.reduce((s,r)=>s+r.grossAmount,0);
+  return {
+    cash,lineNetIncome,lineFees,other,totalIncome,totalExpense,net:totalIncome-totalExpense,
+    daily:expenses.filter(r=>r.frequency==="daily").reduce((s,r)=>s+r.grossAmount,0),
+    monthly:expenses.filter(r=>r.frequency==="monthly").reduce((s,r)=>s+r.grossAmount,0),
+    occasional:expenses.filter(r=>r.frequency==="occasional").reduce((s,r)=>s+r.grossAmount,0)
+  };
+}
+function currentFunds(){
+  refreshToday();
+  let cash=0,digital=0;
+  state.transactions.filter(r=>!r.voidedAt&&r.settledAt&&r.settledAt<=today).forEach(r=>{
+    const signed=r.type==="income" ? lineNet(r) : -r.grossAmount;
+    if(r.account==="cash") cash+=signed; else digital+=signed;
+  });
+
+  // 舊版相容：bank_to_cash 是先領現、cash_to_owner 再交老闆。
+  const legacyWithdrawals=state.transfers
+    .filter(t=>!t.voidedAt&&t.kind==="bank_to_cash"&&t.transferDate<=today)
+    .reduce((s,t)=>s+t.amount,0);
+
+  const cashOwnerPaid=state.transfers
+    .filter(t=>!t.voidedAt&&t.kind==="cash_to_owner"&&t.transferDate<=today)
+    .reduce((s,t)=>s+t.amount,0);
+
+  // 新版：公司帳戶領現後直接交老闆，一筆完成，不進入店內現金。
+  const bankOwnerPaid=state.transfers
+    .filter(t=>!t.voidedAt&&t.kind==="bank_to_owner"&&t.transferDate<=today)
+    .reduce((s,t)=>s+t.amount,0);
+
+  return {
+    cashAvailable:cash+legacyWithdrawals-cashOwnerPaid,
+    digitalAvailable:digital-legacyWithdrawals-bankOwnerPaid
+  };
+}
+function periodMatch(r){
+  const [y,m]=r.occurredAt.split("-").map(Number);
+  if(state.view==="month") return r.occurredAt.startsWith($("reportMonth").value);
+  if(state.view==="quarter"){
+    const yy=Number($("reportYear").value),q=Number($("reportQuarter").value),start=(q-1)*3+1;
+    return y===yy&&m>=start&&m<=start+2;
+  }
+  return y===Number($("reportYear").value);
+}
+function periodTitle(){
+  if(state.view==="month"){const [y,m]=$("reportMonth").value.split("-");return `${y} 年 ${Number(m)} 月`;}
+  if(state.view==="quarter") return `${$("reportYear").value} 年 Q${$("reportQuarter").value}`;
+  return `${$("reportYear").value} 年`;
+}
+function monthlyCashOwnerPaid(month){
+  return state.transfers
+    .filter(t=>!t.voidedAt&&t.kind==="cash_to_owner"&&t.reportMonth===month)
+    .reduce((s,t)=>s+t.amount,0);
+}
+function monthlyBankOwnerPaid(month){
+  return state.transfers
+    .filter(t=>!t.voidedAt&&t.kind==="bank_to_owner"&&t.reportMonth===month)
+    .reduce((s,t)=>s+t.amount,0);
+}
+function monthlyOwnerPaid(month){
+  return monthlyCashOwnerPaid(month)+monthlyBankOwnerPaid(month);
+}
+
+function updateMode(){
+  const income=$("type").value==="income";
+  $("linePayBox").classList.toggle("hidden",!(income&&$("account").value==="linepay"));
+  $("expenseBox").classList.toggle("hidden",income);
+  updatePreview();
+}
+function updatePending(){
+  const pending=$("pendingToggle").checked;
+
+  // 日常已完成交易：不顯示第二個日期，實際收付款日直接沿用歸屬日期。
+  // 待收/待付：只顯示預計日期。
+  // 若正在編輯一筆原本待收/待付的資料，且改成已完成，
+  // 才顯示真正的實際收付款日期。
+  const completingPreviousPending =
+    Boolean(state.editingId) &&
+    state.editingWasPending &&
+    !pending;
+
+  $("expectedWrap").classList.toggle("hidden",!pending);
+  $("settledWrap").classList.toggle("hidden",!completingPreviousPending);
+
+  if(completingPreviousPending && !$("settledAt").value){
+    $("settledAt").value=today;
+  }
+}
+function updatePreview(){
+  const amount=Math.max(Number($("amount").value||0),0),rate=Math.min(Math.max(Number($("lineRate").value||0),0),100);
+  $("linePreview").textContent=money(amount-calcFee(amount,rate));
+}
+function resetForm(){
+  state.editingId=null;state.editingWasPending=false;$("formTitle").textContent="每日收支登記";$("formHint").textContent="每天最常使用的功能放在最前面。";$("saveRecordBtn").textContent="新增流水";$("cancelEdit").classList.add("hidden");
+  $("type").value="income";$("amount").value="";$("occurredAt").value=today;$("account").value="cash";$("lineRate").value="0";$("frequency").value="daily";$("category").value="材料進貨";$("pendingToggle").checked=false;$("settledAt").value=today;$("expectedAt").value="";$("note").value="";$("formMessage").textContent="";updateMode();updatePending();
+}
+function beginEdit(id){
+  const r=state.transactions.find(x=>x.id===id);if(!r||r.voidedAt)return;
+  state.editingId=id;state.editingWasPending=!r.settledAt;$("formTitle").textContent="編輯這筆收支";$("formHint").textContent="修改後會覆蓋原紀錄，並保留修改紀錄。";$("saveRecordBtn").textContent="儲存修改";$("cancelEdit").classList.remove("hidden");
+  $("type").value=r.type;$("amount").value=String(r.grossAmount);$("occurredAt").value=r.occurredAt;$("account").value=r.account;$("lineRate").value=String(r.lineFeeRate||0);$("frequency").value=r.frequency||"daily";$("category").value=canonicalCategory(r.category||"材料進貨");$("pendingToggle").checked=!r.settledAt;$("settledAt").value=r.settledAt||today;$("expectedAt").value=r.expectedAt||"";$("note").value=r.note||"";
+  updateMode();updatePending();$("recordForm").scrollIntoView({behavior:"smooth",block:"start"});
+}
+async function saveRecord(e){
+  e.preventDefault();
+  refreshToday();
+  const amount=Number($("amount").value),type=$("type").value,account=$("account").value,pending=$("pendingToggle").checked;
+  if(!Number.isFinite(amount)||amount<=0){$("formMessage").textContent="請輸入有效金額。";return;}
+  const completingPreviousPending=Boolean(state.editingId)&&state.editingWasPending&&!pending;
+  if(completingPreviousPending&&!$("settledAt").value){$("formMessage").textContent="這筆原本尚未收／付，請填真正的實際收付款日期。";return;}
+  const rate=type==="income"&&account==="linepay"?Math.min(Math.max(Number($("lineRate").value||0),0),100):0;
+  let existing=null;
+  if(state.editingId){
+    existing=state.transactions.find(x=>x.id===state.editingId)||null;
+  }
+
+  let settledAt=null;
+  if(!pending){
+    if(completingPreviousPending){
+      // 原本待收/待付，這次才真正完成。
+      settledAt=$("settledAt").value;
+    }else if(existing?.settledAt && existing.settledAt!==existing.occurredAt){
+      // 已存在「特殊實際收付款日」（例如 8 月歸屬、10 月才收款）：
+      // 單純修改金額/名稱時必須保留，不得偷改回歸屬日。
+      settledAt=existing.settledAt;
+    }else{
+      // 一般日常交易：實際日期與歸屬日期連動。
+      settledAt=$("occurredAt").value;
+    }
+  }
+
+  const record={
+    id:state.editingId||uuid(),type,account,grossAmount:amount,occurredAt:$("occurredAt").value,
+    settledAt,expectedAt:pending?($("expectedAt").value||null):null,
+    lineFeeRate:rate,lineFeeAmount:calcFee(amount,rate),frequency:type==="expense"?$("frequency").value:null,
+    category:type==="expense"?canonicalCategory($("category").value):null,note:$("note").value.trim()||null,
+    voidedAt:null,voidReason:null,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()
+  };
+  if(state.editingId){
+    const idx=state.transactions.findIndex(x=>x.id===state.editingId),before=structuredClone(state.transactions[idx]);
+    record.createdAt=before.createdAt; record.voidedAt=before.voidedAt;record.voidReason=before.voidReason;
+    state.transactions[idx]=record;await put("transactions",record);await audit("UPDATE","transaction",record.id,before,record);
+    $("dailyDate").value=record.occurredAt;resetForm();$("formMessage").textContent="✓ 原紀錄已更新。";
+  }else{
+    state.transactions.push(record);await put("transactions",record);await audit("INSERT","transaction",record.id,null,record);
+    $("dailyDate").value=record.occurredAt;$("amount").value="";$("note").value="";$("formMessage").textContent="✓ 已新增流水。";
+  }
+  await saveMutation();
+}
+async function voidRecord(id){
+  const reason=prompt("請輸入作廢原因，例如：重複輸入");
+  if(!reason?.trim()) return;
+  const idx=state.transactions.findIndex(x=>x.id===id),before=structuredClone(state.transactions[idx]);
+  state.transactions[idx]={...before,voidedAt:new Date().toISOString(),voidReason:reason.trim(),updatedAt:new Date().toISOString()};
+  await put("transactions",state.transactions[idx]);await audit("VOID","transaction",id,before,state.transactions[idx]);await saveMutation();
+}
+async function restoreRecord(id){
+  const idx=state.transactions.findIndex(x=>x.id===id),before=structuredClone(state.transactions[idx]);
+  state.transactions[idx]={...before,voidedAt:null,voidReason:null,updatedAt:new Date().toISOString()};
+  await put("transactions",state.transactions[idx]);await audit("RESTORE","transaction",id,before,state.transactions[idx]);await saveMutation();
+}
+function shiftDay(offset){
+  const [y,m,d]=$("dailyDate").value.split("-").map(Number),dt=new Date(Date.UTC(y,m-1,d+offset));
+  $("dailyDate").value=[dt.getUTCFullYear(),String(dt.getUTCMonth()+1).padStart(2,"0"),String(dt.getUTCDate()).padStart(2,"0")].join("-");renderDaily();
+}
+function renderDaily(){
+  const rows=state.transactions.filter(r=>r.occurredAt===$("dailyDate").value).sort((a,b)=>Boolean(a.voidedAt)-Boolean(b.voidedAt)||(a.type===b.type?0:a.type==="income"?-1:1));
+  const d=businessCalc(rows);$("dailyIncome").textContent=money(d.totalIncome);$("dailyExpense").textContent=money(d.totalExpense);$("dailyNet").textContent=money(d.net);$("dailyEmpty").classList.toggle("hidden",rows.length>0);
+  $("dailyRecords").innerHTML=rows.map(r=>`<article class="record ${r.voidedAt?"voided":""}">
+    <div class="row between"><div style="min-width:0"><strong>${r.voidedAt?"已作廢 · ":""}${r.type==="income"?"收入":"支出"} · ${accountName(r.account)}</strong>
+    <div class="muted small">${esc(r.type==="expense"?canonicalCategory(r.category):"營業收入")}${r.note?" · "+esc(r.note):""}</div>
+    <div class="muted small">歸屬 ${r.occurredAt} · ${r.settledAt?"實際收付 "+r.settledAt:"尚未收付"+(r.expectedAt?" · 預計 "+r.expectedAt:"")}${r.voidedAt?" · 作廢："+esc(r.voidReason):""}</div></div>
+    <div class="right"><strong>${r.type==="income"?"+":"-"}${money(r.type==="income"?lineNet(r):r.grossAmount)}</strong>
+    <div class="row" style="justify-content:flex-end;margin-top:7px">${r.voidedAt?`<button class="btn restoreBtn" data-id="${r.id}" type="button">恢復</button>`:`<button class="btn editBtn" data-id="${r.id}" type="button">編輯</button><button class="btn btn-danger voidBtn" data-id="${r.id}" type="button">作廢</button>`}</div></div></div></article>`).join("");
+  document.querySelectorAll(".editBtn").forEach(b=>b.onclick=()=>beginEdit(b.dataset.id));
+  document.querySelectorAll(".voidBtn").forEach(b=>b.onclick=()=>voidRecord(b.dataset.id));
+  document.querySelectorAll(".restoreBtn").forEach(b=>b.onclick=()=>restoreRecord(b.dataset.id));
+}
+function renderGrouped(rows){
+  const groups={};rows.forEach(r=>(groups[r.occurredAt]??=[]).push(r));
+  $("groupedLedger").innerHTML=Object.keys(groups).sort().map(date=>{
+    const list=groups[date].slice().sort((a,b)=>Boolean(a.voidedAt)-Boolean(b.voidedAt)||(a.type===b.type?0:a.type==="income"?-1:1)),d=businessCalc(list);
+    return `<section class="group"><div class="group-head row between"><strong>${date}</strong><div class="row small"><span>收入 <strong>${money(d.totalIncome)}</strong></span><span>支出 <strong>${money(d.totalExpense)}</strong></span><span>淨收入 <strong>${money(d.net)}</strong></span></div></div>
+      <div class="table-wrap"><table><thead><tr><th>類型</th><th>金流</th><th>分類</th><th class="right">淨金額</th><th>實際收付日</th><th>備註</th></tr></thead><tbody>
+      ${list.map(r=>`<tr style="opacity:${r.voidedAt?.55:1}"><td>${r.voidedAt?"已作廢 · ":""}${r.type==="income"?"收入":"支出"}</td><td>${accountName(r.account)}</td><td>${esc(r.type==="expense"?canonicalCategory(r.category):"營業收入")}</td><td class="right">${money(r.type==="income"?lineNet(r):r.grossAmount)}</td><td>${r.settledAt||"尚未收付"}</td><td>${esc(r.note||"")}${r.voidedAt?"（作廢："+esc(r.voidReason)+"）":""}</td></tr>`).join("")}
+      </tbody></table></div></section>`;
+  }).join("");
+}
+function renderPending(){
+  refreshToday();
+  const pending=state.transactions.filter(r=>!r.voidedAt&&!r.settledAt);
+  const receivable=pending.filter(r=>r.type==="income").reduce((s,r)=>s+lineNet(r),0);
+  const payable=pending.filter(r=>r.type==="expense").reduce((s,r)=>s+r.grossAmount,0);
+  const overdue=pending.filter(r=>r.expectedAt&&r.expectedAt<today).length;
+  $("pendingReceivable").textContent=money(receivable);$("pendingPayable").textContent=money(payable);$("pendingCount").textContent=String(pending.length);
+  $("overduePill").classList.toggle("hidden",overdue===0);$("overduePill").textContent=`逾期 ${overdue} 筆`;
+}
+function renderSettlement(){
+  const month=$("reportMonth").value;
+  const biz=businessCalc(state.transactions.filter(r=>r.occurredAt.startsWith(month)));
+  const funds=currentFunds();
+  const cashPaid=monthlyCashOwnerPaid(month);
+  const bankPaid=monthlyBankOwnerPaid(month);
+  const paid=cashPaid+bankPaid;
+  const due=Math.max(biz.net,0);
+  const remaining=Math.max(due-paid,0);
+  const bankNeeded=Math.max(remaining-Math.max(funds.cashAvailable,0),0);
+
+  $("ownerDue").textContent=money(due);
+  $("cashAvailable").textContent=money(funds.cashAvailable);
+  $("digitalAvailable").textContent=money(funds.digitalAvailable);
+  $("ownerRemaining").textContent=money(remaining);
+  $("cashOwnerPaid").textContent=money(cashPaid);
+  $("bankOwnerPaid").textContent=money(bankPaid);
+  $("bankNeeded").textContent=money(bankNeeded);
+
+  const warn=$("settlementWarning");
+  const insufficient=bankNeeded>Math.max(funds.digitalAvailable,0);
+  warn.classList.toggle("hidden",!insufficient);
+  warn.textContent="目前店內現金加上公司帳戶可用新增資金，仍不足以全部結清。可能仍有跨月未入帳款，請先對帳。";
+  renderSettlementHistory(month);
+}
+function render(){
+  document.querySelectorAll(".viewBtn").forEach(b=>b.classList.toggle("btn-soft",b.dataset.view===state.view));
+  $("monthWrap").classList.toggle("hidden",state.view!=="month");$("yearWrap").classList.toggle("hidden",state.view==="month");$("quarterWrap").classList.toggle("hidden",state.view!=="quarter");$("settlementCard").classList.toggle("hidden",state.view!=="month");
+  const rows=state.transactions.filter(periodMatch),d=businessCalc(rows);
+  $("periodTitle").textContent=periodTitle();$("cashIncome").textContent=money(d.cash);$("lineNetIncome").textContent=money(d.lineNetIncome);$("businessExpense").textContent=money(d.totalExpense);$("businessNet").textContent=money(d.net);
+  $("incomeCash").textContent=money(d.cash);$("incomeLineNet").textContent=money(d.lineNetIncome);$("incomeOther").textContent=money(d.other);$("totalIncome").textContent=money(d.totalIncome);$("lineFeeInfo").textContent=money(d.lineFees);
+  $("expenseDaily").textContent=money(d.daily);$("expenseMonthly").textContent=money(d.monthly);$("expenseOccasional").textContent=money(d.occasional);$("expenseTotal").textContent=money(d.totalExpense);
+  const categorySummary=expenseCategorySummary(rows);
+  $("materialCostTotal").textContent=money(categorySummary["材料進貨"]||0);
+  const categoryOrder=["材料進貨","水電","人事","房租","運費","設備","行銷","雜支","其他"];
+  $("expenseCategoryGrid").innerHTML=categoryOrder.map(category=>`<div class="category-item"><div class="muted small">${category}</div><div class="value">${money(categorySummary[category]||0)}</div></div>`).join("");
+  $("listCount").textContent=`${periodTitle()} · ${rows.length} 筆（含作廢）`;$("periodEmpty").classList.toggle("hidden",rows.length>0);$("periodTotals").classList.toggle("hidden",rows.length===0);
+  $("periodIncomeTotal").textContent=money(d.totalIncome);$("periodExpenseTotal").textContent=money(d.totalExpense);$("periodNetTotal").textContent=money(d.net);
+  renderGrouped(rows);renderDaily();renderPending();if(state.view==="month")renderSettlement();renderBackupStatus();
+}
+async function addOwnerSettlement(source,amount){
+  if(!Number.isFinite(amount)||amount<=0)return false;
+  refreshToday();
+
+  const kind=source==="bank" ? "bank_to_owner" : "cash_to_owner";
+  const row={
+    id:uuid(),
+    kind,
+    reportMonth:$("reportMonth").value,
+    transferDate:today,
+    amount,
+    note:source==="bank" ? "公司帳戶領現後直接交老闆" : "店內現金交老闆",
+    voidedAt:null,
+    voidReason:null,
+    createdAt:new Date().toISOString(),
+    updatedAt:new Date().toISOString()
+  };
+
+  state.transfers.push(row);
+  await put("transfers",row);
+  await audit("INSERT","transfer",row.id,null,row);
+  await saveMutation();
+  return true;
+}
+
+async function voidSettlement(id){
+  const reason=prompt("請輸入結算作廢原因，例如：金額輸入錯誤");
+  if(!reason?.trim()) return;
+
+  const idx=state.transfers.findIndex(x=>x.id===id);
+  if(idx<0) return;
+
+  const before=structuredClone(state.transfers[idx]);
+  state.transfers[idx]={
+    ...before,
+    voidedAt:new Date().toISOString(),
+    voidReason:reason.trim(),
+    updatedAt:new Date().toISOString()
+  };
+
+  await put("transfers",state.transfers[idx]);
+  await audit("VOID","transfer",id,before,state.transfers[idx]);
+  $("settlementMessage").textContent="✓ 結算紀錄已作廢，原紀錄仍保留供核對。";
+  await saveMutation();
+}
+async function restoreSettlement(id){
+  const idx=state.transfers.findIndex(x=>x.id===id);
+  if(idx<0) return;
+
+  const before=structuredClone(state.transfers[idx]);
+  state.transfers[idx]={
+    ...before,
+    voidedAt:null,
+    voidReason:null,
+    updatedAt:new Date().toISOString()
+  };
+
+  await put("transfers",state.transfers[idx]);
+  await audit("RESTORE","transfer",id,before,state.transfers[idx]);
+  $("settlementMessage").textContent="✓ 結算紀錄已恢復。";
+  await saveMutation();
+}
+function settlementLabel(kind){
+  if(kind==="cash_to_owner") return "店內現金交老闆";
+  if(kind==="bank_to_owner") return "公司帳戶領現後直接交老闆";
+  if(kind==="bank_to_cash") return "舊版：公司帳戶領現";
+  return kind;
+}
+function renderSettlementHistory(month){
+  const rows=state.transfers
+    .filter(t=>t.reportMonth===month)
+    .slice()
+    .sort((a,b)=>(b.transferDate||"").localeCompare(a.transferDate||"")||(b.createdAt||"").localeCompare(a.createdAt||""));
+
+  $("settlementHistoryEmpty").classList.toggle("hidden",rows.length>0);
+  $("settlementHistory").innerHTML=rows.map(t=>`<article class="record ${t.voidedAt?"voided":""}">
+    <div class="row between">
+      <div>
+        <strong>${t.voidedAt?"已作廢 · ":""}${esc(settlementLabel(t.kind))}</strong>
+        <div class="muted small">${esc(t.transferDate||"")} ${t.note?" · "+esc(t.note):""}${t.voidedAt?" · 原因："+esc(t.voidReason||""):""}</div>
+      </div>
+      <div class="right">
+        <strong>${money(t.amount)}</strong>
+        <div class="row no-print" style="justify-content:flex-end;margin-top:7px">
+          ${t.voidedAt
+            ? `<button class="btn restoreSettlementBtn" data-id="${t.id}" type="button">恢復</button>`
+            : `<button class="btn btn-danger voidSettlementBtn" data-id="${t.id}" type="button">作廢</button>`}
+        </div>
+      </div>
+    </div>
+  </article>`).join("");
+
+  document.querySelectorAll(".voidSettlementBtn").forEach(b=>b.onclick=()=>voidSettlement(b.dataset.id));
+  document.querySelectorAll(".restoreSettlementBtn").forEach(b=>b.onclick=()=>restoreSettlement(b.dataset.id));
+}
+
+async function saveOwnerSettlement(){
+  refreshToday();
+  const month=$("reportMonth").value;
+  const source=$("ownerPaySource").value;
+  const amount=Number($("ownerSettlementAmount").value);
+  const biz=businessCalc(state.transactions.filter(r=>r.occurredAt.startsWith(month)));
+  const funds=currentFunds();
+  const remaining=Math.max(Math.max(biz.net,0)-monthlyOwnerPaid(month),0);
+
+  if(!Number.isFinite(amount)||amount<=0){
+    $("settlementMessage").textContent="請輸入有效的結算金額。";
+    return;
+  }
+  if(amount>remaining){
+    $("settlementMessage").textContent="結算金額超過本月尚未結算的淨收入。";
+    return;
+  }
+
+  if(source==="cash" && amount>Math.max(funds.cashAvailable,0)){
+    $("settlementMessage").textContent="目前店內可用現金不足，請改用公司帳戶來源或降低金額。";
+    return;
+  }
+
+  if(source==="bank" && amount>Math.max(funds.digitalAvailable,0)){
+    $("settlementMessage").textContent="目前公司帳戶可用新增資金不足。";
+    return;
+  }
+
+  if(await addOwnerSettlement(source,amount)){
+    $("ownerSettlementAmount").value="";
+    $("settlementMessage").textContent=
+      source==="bank"
+        ? "✓ 已記錄：公司帳戶領現後直接交給老闆。"
+        : "✓ 已記錄：店內現金交給老闆。";
+  }
+}
+function printPdf(){
+  const original=document.title;
+  document.title=`店舖收支報表_${periodTitle().replace(/\s/g,"")}`;
+  window.print();
+  setTimeout(()=>document.title=original,500);
+}
+
+$("recordForm").addEventListener("submit",saveRecord);
+$("cancelEdit").onclick=resetForm;
+$("type").onchange=updateMode;$("account").onchange=updateMode;$("amount").oninput=updatePreview;$("lineRate").oninput=updatePreview;$("pendingToggle").onchange=updatePending;
+$("prevDay").onclick=()=>shiftDay(-1);$("nextDay").onclick=()=>shiftDay(1);$("dailyDate").onchange=renderDaily;
+document.querySelectorAll(".viewBtn").forEach(b=>b.onclick=()=>{state.view=b.dataset.view;render();});
+$("reportMonth").onchange=render;$("reportYear").oninput=render;$("reportQuarter").onchange=render;
+$("fillOwnerSettlement").onclick=()=>{
+  const month=$("reportMonth").value;
+  const biz=businessCalc(state.transactions.filter(r=>r.occurredAt.startsWith(month)));
+  const funds=currentFunds();
+  const remaining=Math.max(Math.max(biz.net,0)-monthlyOwnerPaid(month),0);
+  const source=$("ownerPaySource").value;
+  const available=source==="bank" ? Math.max(funds.digitalAvailable,0) : Math.max(funds.cashAvailable,0);
+  $("ownerSettlementAmount").value=String(Math.round(Math.min(remaining,available)));
+};
+$("saveOwnerSettlement").onclick=saveOwnerSettlement;
+$("ownerPaySource").onchange=()=>{$("ownerSettlementAmount").value="";$("settlementMessage").textContent="";};
+$("exportPdf").onclick=printPdf;
+
+$("backupPanelBtn").onclick=()=>{$("backupPanel").classList.remove("hidden");renderBackupStatus();};
+$("closeBackupPanel").onclick=()=>$("backupPanel").classList.add("hidden");
+$("chooseBackupFolder").onclick=chooseBackupFolder;
+$("backupNow").onclick=async()=>{if(!state.backupHandle){$("backupMessage").textContent="請先選擇備份資料夾，或使用「下載完整備份」。";return;}if(!(await verifyHandlePermission(state.backupHandle,true))){$("backupMessage").textContent="沒有備份資料夾寫入權限。";return;}await autoBackup(true);};
+$("downloadBackup").onclick=downloadBackup;
+$("restoreInput").onchange=async e=>{const file=e.target.files?.[0];if(file)await restoreFromFile(file);e.target.value="";};
+
+(async function init(){
+  if(!("indexedDB" in window)){
+    $("saveStatus").textContent="此瀏覽器不支援本機資料庫";$("saveStatus").classList.add("backup-bad");return;
+  }
+  try{
+    db=await openDB();
+    await loadAll();
+    await requestPersistentStorage();
+    $("saveStatus").textContent="✓ 本機資料已載入";
+    $("saveStatus").classList.add("backup-ok");
+    updateMode();updatePending();render();
+
+    // 長時間開著程式時，每分鐘檢查是否跨日。
+    setInterval(()=>{
+      if(refreshToday()){
+        renderPending();
+        if(state.view==="month") renderSettlement();
+      }
+    },60000);
+  }catch(e){
+    $("saveStatus").textContent="資料庫載入失敗";$("backupMessage").textContent="本機資料庫錯誤："+e.message;
+  }
+})();
+})();
+</script>
+
+<script>
+if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch((error) => {
+      console.warn("Service Worker 註冊失敗：", error);
+    });
+  });
+}
+</script>
+
+</body>
+</html>
