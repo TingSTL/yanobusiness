@@ -95,8 +95,30 @@ details>summary{cursor:pointer;font-weight:700}
       <input id="restoreInput" type="file" accept=".json,application/json" style="display:none">
     </label>
   </div>
+  <details class="notice" open>
+    <summary>LINE／手機內建瀏覽器緊急搬家</summary>
+    <div class="stack" style="margin-top:10px">
+      <div class="muted small">下載沒反應時，用文字搬家，不需要下載檔案。</div>
+      <div class="row">
+        <button id="showEmergencyBackup" class="btn btn-soft" type="button">顯示完整備份文字</button>
+        <button id="copyEmergencyBackup" class="btn" type="button">複製完整備份</button>
+      </div>
+      <label class="label">
+        <span>完整備份文字</span>
+        <textarea id="emergencyBackupText" rows="8" readonly placeholder="按上面的按鈕後會出現在這裡"></textarea>
+      </label>
+      <div class="divider">
+        <div class="muted small">新瀏覽器恢復：</div>
+        <label class="label" style="margin-top:8px">
+          <span>貼上備份文字</span>
+          <textarea id="emergencyRestoreText" rows="6" placeholder="把舊瀏覽器複製的完整備份文字貼在這裡"></textarea>
+        </label>
+        <button id="restoreFromText" class="btn btn-primary" type="button" style="margin-top:8px">從貼上的備份文字恢復</button>
+      </div>
+    </div>
+  </details>
   <div id="backupMessage" class="notice muted">
-    建議：把備份資料夾選在 Google Drive for desktop 的同步資料夾。若瀏覽器不支援自動寫入資料夾，仍可用「下載完整備份」。
+    若下載無反應，可改用「複製完整備份」。
   </div>
 </section>
 
@@ -497,28 +519,74 @@ function downloadBackup(){
   a.href=url; a.download=`店舖帳務完整備份_${new Date().toISOString().slice(0,10)}.json`;
   document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
 }
-async function restoreFromFile(file){
-  let data;
-  try{data=JSON.parse(await file.text());}catch{alert("這不是有效的 JSON 備份檔。");return;}
+async function restoreFromData(data,sourceLabel="備份文字"){
   if(data?.backupVersion!==BACKUP_VERSION || !Array.isArray(data.transactions) || !Array.isArray(data.transfers)){
-    alert("備份格式不正確或版本不相容。");return;
+    alert("備份格式不正確或版本不相容。");return false;
   }
   const active=data.transactions.filter(x=>!x.voidedAt);
   const dates=active.map(x=>x.occurredAt).filter(Boolean).sort();
-  const summary=`備份時間：${new Date(data.exportedAt).toLocaleString("zh-TW")}\n收支紀錄：${data.transactions.length} 筆\n資金移轉：${data.transfers.length} 筆\n最早紀錄：${dates[0]||"無"}\n最新紀錄：${dates.at(-1)||"無"}\n\n恢復會取代目前本機資料。確定繼續？`;
-  if(!confirm(summary)) return;
-  // 優先先把現況備份出去
-  if(state.backupHandle && await verifyHandlePermission(state.backupHandle,false)){
-    try{await autoBackup(true);}catch{}
-  }
+  const when=data.exportedAt ? new Date(data.exportedAt).toLocaleString("zh-TW") : "未知";
+  const summary=`備份時間：${when}\n收支紀錄：${data.transactions.length} 筆\n資金移轉：${data.transfers.length} 筆\n最早紀錄：${dates[0]||"無"}\n最新紀錄：${dates.at(-1)||"無"}\n\n恢復會取代目前本機資料。確定繼續？`;
+  if(!confirm(summary)) return false;
+
   await Promise.all(stores.filter(s=>s!=="meta").map(clearStore));
-  state.transactions=data.transactions||[];state.transfers=data.transfers||[];state.audit=data.audit||[];
+  state.transactions=data.transactions||[];
+  state.transfers=data.transfers||[];
+  state.audit=data.audit||[];
+
   for(const r of state.transactions) await put("transactions",r);
   for(const r of state.transfers) await put("transfers",r);
   for(const r of state.audit) await put("audit",r);
-  await audit("RESTORE","backup","restore",null,{file:file.name,exportedAt:data.exportedAt});
-  $("backupMessage").textContent="✓ 備份已恢復。建議立即建立一份新的版本備份。";
+
+  await audit("RESTORE","backup","restore",null,{source:sourceLabel,exportedAt:data.exportedAt});
+  $("backupMessage").textContent="✓ 備份已恢復。";
   await saveMutation();
+  return true;
+}
+async function restoreFromFile(file){
+  let data;
+  try{data=JSON.parse(await file.text());}
+  catch{alert("這不是有效的 JSON 備份檔。");return;}
+  await restoreFromData(data,file.name);
+}
+function showEmergencyBackup(){
+  const text=backupText();
+  $("emergencyBackupText").value=text;
+  $("backupMessage").textContent=`✓ 已產生完整備份文字，共 ${state.transactions.length} 筆。`;
+  $("emergencyBackupText").focus();
+  $("emergencyBackupText").select();
+}
+async function copyEmergencyBackup(){
+  const text=backupText();
+  $("emergencyBackupText").value=text;
+
+  try{
+    if(navigator.clipboard?.writeText){
+      await navigator.clipboard.writeText(text);
+      $("backupMessage").textContent="✓ 完整備份已複製。請立刻貼到自己的 LINE 聊天室、備忘錄或 Google 文件。";
+      return;
+    }
+  }catch{}
+
+  $("emergencyBackupText").focus();
+  $("emergencyBackupText").select();
+
+  try{
+    const ok=document.execCommand("copy");
+    $("backupMessage").textContent=ok
+      ?"✓ 已複製。請立刻貼到安全位置。"
+      :"無法自動複製；文字已全選，請長按複製。";
+  }catch{
+    $("backupMessage").textContent="無法自動複製；文字已全選，請長按複製。";
+  }
+}
+async function restoreFromEmergencyText(){
+  const text=$("emergencyRestoreText").value.trim();
+  if(!text){alert("請先貼上完整備份文字。");return;}
+  let data;
+  try{data=JSON.parse(text);}
+  catch{alert("貼上的內容不是有效備份文字。");return;}
+  if(await restoreFromData(data,"貼上備份文字")) $("emergencyRestoreText").value="";
 }
 async function requestPersistentStorage(){
   const status=$("persistenceStatus");
@@ -970,6 +1038,9 @@ $("closeBackupPanel").onclick=()=>$("backupPanel").classList.add("hidden");
 $("chooseBackupFolder").onclick=chooseBackupFolder;
 $("backupNow").onclick=async()=>{if(!state.backupHandle){$("backupMessage").textContent="請先選擇備份資料夾，或使用「下載完整備份」。";return;}if(!(await verifyHandlePermission(state.backupHandle,true))){$("backupMessage").textContent="沒有備份資料夾寫入權限。";return;}await autoBackup(true);};
 $("downloadBackup").onclick=downloadBackup;
+$("showEmergencyBackup").onclick=showEmergencyBackup;
+$("copyEmergencyBackup").onclick=copyEmergencyBackup;
+$("restoreFromText").onclick=restoreFromEmergencyText;
 $("restoreInput").onchange=async e=>{const file=e.target.files?.[0];if(file)await restoreFromFile(file);e.target.value="";};
 
 (async function init(){
